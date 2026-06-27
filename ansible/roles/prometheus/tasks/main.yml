@@ -1,0 +1,80 @@
+- name: Create prometheus user
+  become: true
+  ansible.builtin.user:
+    name: prometheus
+    shell: /usr/sbin/nologin
+    system: true
+
+- name: Create prometheus directories
+  become: true
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: prometheus
+    group: prometheus
+  loop:
+    - /etc/prometheus
+    - /var/lib/prometheus
+
+- name: Download prometheus
+  become: true
+  ansible.builtin.get_url:
+    url: https://github.com/prometheus/prometheus/releases/download/v2.53.1/prometheus-2.53.1.linux-amd64.tar.gz
+    dest: /tmp/prometheus.tar.gz
+
+- name: Unpack prometheus
+  become: true
+  ansible.builtin.unarchive:
+    src: /tmp/prometheus.tar.gz
+    dest: /tmp
+    remote_src: true
+
+- name: Install prometheus binaries
+  become: true
+  ansible.builtin.copy:
+    src: "/tmp/prometheus-2.53.1.linux-amd64/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    mode: "0755"
+    owner: prometheus
+    group: prometheus
+    remote_src: true
+  loop:
+    - prometheus
+    - promtool
+
+- name: Deploy prometheus config
+  become: true
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: /etc/prometheus/prometheus.yml
+    owner: prometheus
+    group: prometheus
+  notify: restart prometheus
+
+- name: Create prometheus systemd unit
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/prometheus.service
+    content: |
+      [Unit]
+      Description=Prometheus
+      After=network.target
+
+      [Service]
+      User=prometheus
+      Group=prometheus
+      ExecStart=/usr/local/bin/prometheus \
+        --config.file=/etc/prometheus/prometheus.yml \
+        --storage.tsdb.path=/var/lib/prometheus \
+        --storage.tsdb.retention.time=15d
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Start and enable prometheus
+  become: true
+  ansible.builtin.systemd:
+    name: prometheus
+    state: started
+    enabled: true
+    daemon_reload: true

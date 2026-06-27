@@ -1,0 +1,41 @@
+- name: Download nginxlog_exporter deb
+  become: true
+  ansible.builtin.get_url:
+    url: https://github.com/martin-helmich/prometheus-nginxlog-exporter/releases/download/v1.11.0/prometheus-nginxlog-exporter_1.11.0_linux_amd64.deb
+    dest: /tmp/nginxlog_exporter.deb
+
+- name: Install nginxlog_exporter
+  become: true
+  ansible.builtin.apt:
+    deb: /tmp/nginxlog_exporter.deb
+
+- name: Deploy nginxlog_exporter config
+  become: true
+  ansible.builtin.template:
+    src: config.hcl.j2
+    dest: /etc/prometheus-nginxlog-exporter.hcl
+  notify: restart nginxlog_exporter
+
+- name: Create nginxlog_exporter systemd unit
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/nginxlog_exporter.service
+    content: |
+      [Unit]
+      Description=Nginx Log Exporter
+      After=network.target
+
+      [Service]
+      User=root
+      ExecStart=/usr/bin/prometheus-nginxlog-exporter -config-file /etc/prometheus-nginxlog-exporter.hcl
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Start and enable nginxlog_exporter
+  become: true
+  ansible.builtin.systemd:
+    name: nginxlog_exporter
+    state: started
+    enabled: true
+    daemon_reload: true

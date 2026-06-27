@@ -1,0 +1,13 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+
+# Ключ сервисного аккаунта
+key.json
+*.pem
+
+# Прочее
+.DS_Store
