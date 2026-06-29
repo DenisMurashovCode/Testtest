@@ -1,36 +1,50 @@
-- name: Install prerequisites
+- name: Install Docker
   become: true
   ansible.builtin.apt:
-    name:
-      - apt-transport-https
-      - software-properties-common
-      - gnupg
+    name: docker.io
     state: present
     update_cache: true
 
-- name: Add Grafana GPG key
-  become: true
-  ansible.builtin.apt_key:
-    url: https://apt.grafana.com/gpg.key
-    state: present
-
-- name: Add Grafana repository
-  become: true
-  ansible.builtin.apt_repository:
-    repo: "deb https://apt.grafana.com stable main"
-    state: present
-
-- name: Install Grafana
-  become: true
-  ansible.builtin.apt:
-    name: grafana
-    state: present
-    update_cache: true
-
-- name: Start and enable Grafana
+- name: Ensure Docker is running and enabled
   become: true
   ansible.builtin.systemd:
-    name: grafana-server
+    name: docker
     state: started
     enabled: true
-    daemon_reload: true
+
+- name: Pull Grafana image via first reachable mirror
+  become: true
+  ansible.builtin.shell: |
+    for M in cr.yandex/mirror dockerhub.timeweb.cloud dh-mirror.gitverse.ru huecker.io; do
+      echo "Trying mirror: $M"
+      if docker pull "$M/grafana/grafana:latest"; then
+        docker tag "$M/grafana/grafana:latest" grafana/grafana:latest
+        echo "PULLED_FROM=$M"
+        exit 0
+      fi
+    done
+    echo "ALL_MIRRORS_FAILED" >&2
+    exit 1
+  args:
+    executable: /bin/bash
+  register: grafana_pull
+  changed_when: "'PULLED_FROM' in grafana_pull.stdout"
+
+- name: Run Grafana container
+  become: true
+  ansible.builtin.shell: |
+    if [ -z "$(docker ps -aq -f name=^grafana$)" ]; then
+      docker run -d --name grafana \
+        -p 3000:3000 \
+        -v grafana-storage:/var/lib/grafana \
+        --restart unless-stopped \
+        grafana/grafana:latest
+      echo CREATED
+    else
+      docker start grafana >/dev/null
+      echo STARTED
+    fi
+  args:
+    executable: /bin/bash
+  register: grafana_run
+  changed_when: "'CREATED' in grafana_run.stdout"

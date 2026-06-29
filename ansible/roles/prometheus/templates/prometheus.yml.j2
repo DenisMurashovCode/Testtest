@@ -9,11 +9,13 @@ scrape_configs:
   - job_name: 'node'
     static_configs:
       - targets:
-          - '{{ web1_ip }}:9100'
-          - '{{ web2_ip }}:9100'
+{% for host in groups['web'] %}
+          - '{{ hostvars[host].ansible_host }}:9100'
+{% endfor %}
 
   - job_name: 'nginxlog'
     static_configs:
       - targets:
-          - '{{ web1_ip }}:9113'
-          - '{{ web2_ip }}:9113'
+{% for host in groups['web'] %}
+          - '{{ hostvars[host].ansible_host }}:9113'
+{% endfor %}

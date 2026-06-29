@@ -1,0 +1,33 @@
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3
+
+[web]
+web-1 ansible_host=${web1_ip}
+web-2 ansible_host=${web2_ip}
+
+[web:vars]
+ansible_ssh_common_args='-o ProxyJump=ubuntu@${bastion_ip} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+[prometheus]
+prometheus ansible_host=${prometheus_ip}
+
+[prometheus:vars]
+ansible_ssh_common_args='-o ProxyJump=ubuntu@${bastion_ip} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+[grafana]
+grafana ansible_host=${grafana_ip}
+
+[grafana:vars]
+ansible_ssh_common_args='-o ProxyJump=ubuntu@${bastion_ip} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+[elasticsearch]
+elasticsearch ansible_host=${elasticsearch_ip}
+
+[elasticsearch:vars]
+ansible_ssh_common_args='-o ProxyJump=ubuntu@${bastion_ip} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+[kibana]
+kibana ansible_host=${kibana_ip}
+
+[kibana:vars]
+ansible_ssh_common_args='-o ProxyJump=ubuntu@${bastion_ip} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'

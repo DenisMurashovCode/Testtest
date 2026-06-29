@@ -1,0 +1,53 @@
+- name: Install Docker
+  become: true
+  ansible.builtin.apt:
+    name: docker.io
+    state: present
+    update_cache: true
+
+- name: Ensure Docker is running
+  become: true
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Pull Kibana image via first reachable mirror
+  become: true
+  ansible.builtin.shell: |
+    IMG="kibana:8.15.0"
+    for M in cr.yandex/mirror dockerhub.timeweb.cloud dh-mirror.gitverse.ru huecker.io; do
+      for REF in "$M/$IMG" "$M/library/$IMG"; do
+        echo "Trying $REF"
+        if docker pull "$REF"; then
+          docker tag "$REF" "$IMG"
+          echo "PULLED_FROM=$REF"
+          exit 0
+        fi
+      done
+    done
+    echo "ALL_MIRRORS_FAILED" >&2
+    exit 1
+  args:
+    executable: /bin/bash
+  register: kb_pull
+  changed_when: "'PULLED_FROM' in kb_pull.stdout"
+
+- name: Run Kibana container
+  become: true
+  ansible.builtin.shell: |
+    if [ -z "$(docker ps -aq -f name=^kibana$)" ]; then
+      docker run -d --name kibana \
+        -p 5601:5601 \
+        -e "ELASTICSEARCH_HOSTS=http://{{ elasticsearch_host }}:9200" \
+        --restart unless-stopped \
+        kibana:8.15.0
+      echo CREATED
+    else
+      docker start kibana >/dev/null
+      echo STARTED
+    fi
+  args:
+    executable: /bin/bash
+  register: kb_run
+  changed_when: "'CREATED' in kb_run.stdout"

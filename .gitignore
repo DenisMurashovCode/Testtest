@@ -11,3 +11,8 @@ key.json
 
 # Прочее
 .DS_Store
+
+ansible/inventory.ini
+
+*authorized_key*.json
+sa-key.json

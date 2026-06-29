@@ -1,0 +1,20 @@
+- name: Deploy Elasticsearch
+  hosts: elasticsearch
+  vars:
+    elasticsearch_host: "{{ hostvars['elasticsearch'].ansible_host }}"
+  roles:
+    - elasticsearch
+
+- name: Deploy Kibana
+  hosts: kibana
+  vars:
+    elasticsearch_host: "{{ hostvars['elasticsearch'].ansible_host }}"
+  roles:
+    - kibana
+
+- name: Deploy Filebeat on web servers
+  hosts: web
+  vars:
+    elasticsearch_host: "{{ hostvars['elasticsearch'].ansible_host }}"
+  roles:
+    - filebeat

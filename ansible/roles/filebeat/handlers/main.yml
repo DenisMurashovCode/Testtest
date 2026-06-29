@@ -1,0 +1,5 @@
+- name: restart filebeat
+  become: true
+  ansible.builtin.shell: docker restart filebeat 2>/dev/null || true
+  args:
+    executable: /bin/bash

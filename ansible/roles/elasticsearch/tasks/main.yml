@@ -1,0 +1,70 @@
+- name: Install Docker
+  become: true
+  ansible.builtin.apt:
+    name: docker.io
+    state: present
+    update_cache: true
+
+- name: Ensure Docker is running
+  become: true
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Ensure vm.max_map_count is high enough for Elasticsearch
+  become: true
+  ansible.builtin.shell: |
+    current=$(sysctl -n vm.max_map_count)
+    if [ "$current" -lt 262144 ]; then
+      sysctl -w vm.max_map_count=262144
+      grep -q "^vm.max_map_count" /etc/sysctl.conf || echo "vm.max_map_count=262144" >> /etc/sysctl.conf
+      echo CHANGED
+    fi
+  args:
+    executable: /bin/bash
+  register: vmmax
+  changed_when: "'CHANGED' in vmmax.stdout"
+
+- name: Pull Elasticsearch image via first reachable mirror
+  become: true
+  ansible.builtin.shell: |
+    IMG="elasticsearch:8.15.0"
+    for M in cr.yandex/mirror dockerhub.timeweb.cloud dh-mirror.gitverse.ru huecker.io; do
+      for REF in "$M/$IMG" "$M/library/$IMG"; do
+        echo "Trying $REF"
+        if docker pull "$REF"; then
+          docker tag "$REF" "$IMG"
+          echo "PULLED_FROM=$REF"
+          exit 0
+        fi
+      done
+    done
+    echo "ALL_MIRRORS_FAILED" >&2
+    exit 1
+  args:
+    executable: /bin/bash
+  register: es_pull
+  changed_when: "'PULLED_FROM' in es_pull.stdout"
+
+- name: Run Elasticsearch container
+  become: true
+  ansible.builtin.shell: |
+    if [ -z "$(docker ps -aq -f name=^elasticsearch$)" ]; then
+      docker run -d --name elasticsearch \
+        -p 9200:9200 \
+        -e "discovery.type=single-node" \
+        -e "xpack.security.enabled=false" \
+        -e "ES_JAVA_OPTS=-Xms1g -Xmx1g" \
+        -v esdata:/usr/share/elasticsearch/data \
+        --restart unless-stopped \
+        elasticsearch:8.15.0
+      echo CREATED
+    else
+      docker start elasticsearch >/dev/null
+      echo STARTED
+    fi
+  args:
+    executable: /bin/bash
+  register: es_run
+  changed_when: "'CREATED' in es_run.stdout"

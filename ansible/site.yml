@@ -1,0 +1,12 @@
+- name: Wait until all hosts are reachable over SSH
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Wait for SSH connection (through bastion)
+      ansible.builtin.wait_for_connection:
+        delay: 5
+        timeout: 180
+
+- import_playbook: web.yml
+- import_playbook: monitoring.yml
+- import_playbook: logs.yml
